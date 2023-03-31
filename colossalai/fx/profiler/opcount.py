@@ -223,7 +223,8 @@ def zero_flop_jit(*args):
     return 0
 
 
-if version.parse(torch.__version__) >= version.parse('1.12.0'):
+if version.parse(torch.__version__) >= version.parse('1.12.0') and version.parse(
+        torch.__version__) < version.parse('2.0.0'):
     flop_mapping = {
     # gemm, gemv and dot
         aten.mm.default: matmul_flop_jit,
@@ -347,6 +348,7 @@ if version.parse(torch.__version__) >= version.parse('1.12.0'):
         aten.squeeze.dim,
         aten.slice.Tensor,
         aten.slice_backward.default,
+        aten.stack.default,
         aten.split.Tensor,
         aten.permute.default,
         aten.t.default,
@@ -359,7 +361,8 @@ if version.parse(torch.__version__) >= version.parse('1.12.0'):
         aten.where.self,
         aten.zero_.default,
         aten.zeros_like.default,
-        aten.fill_.Scalar
+        aten.fill_.Scalar,
+        aten.stack.default
     ]  # yapf: disable
 
     for op in zero_flop_aten:

@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+
+envs=""
+while getopts 'g:l:h:p::' OPTION; do
+  case "$OPTION" in
+    h)
+      host="$OPTARG"
+      echo "host is $OPTARG"
+      envs="${envs} MASTER_ADDR=${host}"
+      ;;
+    p)
+      port="$OPTARG"
+      echo "port is $OPTARG"
+      envs="${envs} MASTER_PORT=${port}"
+      ;;  
+    g)
+      global="$OPTARG"
+      echo "global is $OPTARG"
+      envs="${envs} RANK=${global}"
+      ;;
+
+    l)
+      local="$OPTARG"
+      echo "local is $OPTARG"
+      envs="${envs} LOCAL_RANK=${local}"
+      ;;
+    ?)
+      echo "Unknown args! Use: $0 -g xxx -l xxx -h xxx -p xxx" >&2
+      exit 1
+      ;;
+  esac
+done
+shift "$(($OPTIND - 1))"
+
+envs="$envs python p0.py"
+
+echo "Command: $envs"
+
+
+eval "$envs"

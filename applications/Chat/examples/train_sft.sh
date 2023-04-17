@@ -1,10 +1,10 @@
-torchrun --standalone --nproc_per_node=4 train_sft.py \
-    --pretrain "/path/to/LLaMa-7B/" \
+torchrun --standalone --nproc_per_node=2 train_sft.py \
+    --pretrain "decapoda-research/llama-7b-hf" \
     --model 'llama' \
     --strategy colossalai_zero2 \
     --log_interval 10 \
-    --save_path  /path/to/Coati-7B \
-    --dataset /path/to/data.json \
+    --save_path  model_save/Coati-7B \
+    --dataset datasets/instinwild_ch.json \
     --batch_size 4 \
     --accimulation_steps 8 \
     --lr 2e-5 \

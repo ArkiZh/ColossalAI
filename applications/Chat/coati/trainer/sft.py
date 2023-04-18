@@ -1,7 +1,7 @@
 import math
 import time
 from abc import ABC
-from typing import Optional
+from typing import Optional, Union
 
 import loralib as lora
 import torch
@@ -44,7 +44,7 @@ class SFTTrainer(ABC):
         strategy: Strategy,
         optim: Optimizer,
         train_dataloader: DataLoader,
-        eval_dataloader: DataLoader = None,
+        eval_dataloader: Union[DataLoader, None] = None,
         batch_size: int = 1,
         max_epochs: int = 2,
         accimulation_steps: int = 8,

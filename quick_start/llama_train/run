@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+
+envs=""
+while getopts 'w:g:l:h:p::' OPTION; do
+  case "$OPTION" in
+    w)
+      world="$OPTARG"
+      echo "world is $OPTARG"
+      envs="${envs} WORLD_SIZE=${world}"
+      ;;
+    h)
+      host="$OPTARG"
+      echo "host is $OPTARG"
+      envs="${envs} MASTER_ADDR=${host}"
+      ;;
+    p)
+      port="$OPTARG"
+      echo "port is $OPTARG"
+      envs="${envs} MASTER_PORT=${port}"
+      ;;  
+    g)
+      global="$OPTARG"
+      echo "global is $OPTARG"
+      envs="${envs} RANK=${global}"
+      ;;
+
+    l)
+      local="$OPTARG"
+      echo "local is $OPTARG"
+      envs="${envs} LOCAL_RANK=${local}"
+      ;;
+    ?)
+      echo "Unknown args! Use: $0 -w xxx -g xxx -l xxx -h xxx -p xxx" >&2
+      exit 1
+      ;;
+  esac
+done
+shift "$(($OPTIND - 1))"
+
+envs="$envs python llama.py"
+
+echo "Command: $envs"
+
+
+eval "$envs"

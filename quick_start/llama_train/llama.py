@@ -1,6 +1,25 @@
 import argparse
 import os
 
+rank = int(os.environ.get("RANK", 0))
+local_rank = int(os.environ.get("LOCAL_RANK", 0))
+world_size = int(os.environ.get('WORLD_SIZE', 2))
+host = os.environ.get('MASTER_ADDR',"172.20.51.198")
+port = int(os.environ.get('MASTER_PORT', "19090"))
+
+os.environ["RANK"] = str(rank)
+os.environ["LOCAL_RANK"] = str(local_rank)
+os.environ["WORLD_SIZE"] = str(world_size)
+os.environ["MASTER_ADDR"] = str(host)
+os.environ["MASTER_PORT"] = str(port)
+
+print("rank", rank)
+print("local_rank", local_rank)
+print("world_size", world_size)
+print("host", host)
+print("port", port)
+
+
 import loralib as lora
 import torch
 import torch.distributed as dist
@@ -32,7 +51,7 @@ def train(args):
     elif args.strategy == 'ddp':
         strategy = DDPStrategy()
     elif args.strategy == 'colossalai_gemini':
-        strategy = ColossalAIStrategy(stage=3, placement_policy='cuda')
+        strategy = ColossalAIStrategy(stage=3, gpu_margin_mem_ratio=0.7, placement_policy='cpu')
     elif args.strategy == 'colossalai_zero2':
         strategy = ColossalAIStrategy(stage=2, placement_policy='cuda')
     elif args.strategy == 'colossalai_zero2_cpu':
@@ -169,20 +188,21 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+
     parser.add_argument('--strategy',
                         choices=['naive', 'ddp', 'colossalai_gemini', 'colossalai_zero2', 'colossalai_zero2_cpu'],
-                        default='naive')
-    parser.add_argument('--model', choices=['gpt2', 'bloom', 'opt', 'llama'], default='bloom')
-    parser.add_argument('--pretrain', type=str, default=None)
-    parser.add_argument('--dataset', type=str, default=None)
+                        default='colossalai_gemini')
+    parser.add_argument('--model', choices=['gpt2', 'bloom', 'opt', 'llama'], default='llama')
+    parser.add_argument('--pretrain', type=str, default="decapoda-research/llama-7b-hf")
+    parser.add_argument('--dataset', type=str, default="datasets/instinwild_ch.json")
     parser.add_argument('--max_datasets_size', type=int, default=None)
-    parser.add_argument('--save_path', type=str, default='output')
+    parser.add_argument('--save_path', type=str, default='model_saved_here/tmp')
     parser.add_argument('--need_optim_ckpt', type=bool, default=False)
-    parser.add_argument('--max_epochs', type=int, default=3)
-    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--max_epochs', type=int, default=1)
+    parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--max_len', type=int, default=512)
     parser.add_argument('--lora_rank', type=int, default=0, help="low-rank adaptation matrices rank")
-    parser.add_argument('--log_interval', type=int, default=100, help="how many steps to log")
+    parser.add_argument('--log_interval', type=int, default=10, help="how many steps to log")
     parser.add_argument('--lr', type=float, default=5e-6)
     parser.add_argument('--accimulation_steps', type=int, default=8)
     args = parser.parse_args()

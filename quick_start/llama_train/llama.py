@@ -1,10 +1,32 @@
+from colossalai.tensor import ColoParameter
+from colossalai.nn.optimizer import HybridAdam
+from colossalai.logging import get_dist_logger
+from transformers import LlamaConfig, LlamaForCausalLM
+from transformers.models.gpt2.tokenization_gpt2 import GPT2Tokenizer
+from transformers import AutoTokenizer, BloomTokenizerFast
+from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import DataLoader
+from torch.optim import Adam
+from datasets import load_dataset
+from coati.utils import prepare_llama_tokenizer_and_embedding
+from coati.trainer.strategies import ColossalAIStrategy, DDPStrategy, NaiveStrategy
+from coati.trainer import SFTTrainer
+from coati.models.opt import OPTLM
+from coati.models.llama import LlamaLM
+from coati.models.gpt import GPTLM
+from coati.models.bloom import BLOOMLM
+from coati.models.base import RewardModel
+from coati.dataset import DataCollatorForSupervisedDataset, SFTDataset, SupervisedDataset
+import torch.distributed as dist
+import torch
+import loralib as lora
 import argparse
 import os
 
 rank = int(os.environ.get("RANK", 0))
 local_rank = int(os.environ.get("LOCAL_RANK", 0))
 world_size = int(os.environ.get('WORLD_SIZE', 2))
-host = os.environ.get('MASTER_ADDR',"172.20.51.198")
+host = os.environ.get('MASTER_ADDR', "172.20.51.198")
 port = int(os.environ.get('MASTER_PORT', "19090"))
 
 os.environ["RANK"] = str(rank)
@@ -20,39 +42,18 @@ print("host", host)
 print("port", port)
 
 
-import loralib as lora
-import torch
-import torch.distributed as dist
-from coati.dataset import DataCollatorForSupervisedDataset, SFTDataset, SupervisedDataset
-from coati.models.base import RewardModel
-from coati.models.bloom import BLOOMLM
-from coati.models.gpt import GPTLM
-from coati.models.llama import LlamaLM
-from coati.models.opt import OPTLM
-from coati.trainer import SFTTrainer
-from coati.trainer.strategies import ColossalAIStrategy, DDPStrategy, NaiveStrategy
-from coati.utils import prepare_llama_tokenizer_and_embedding
-from datasets import load_dataset
-from torch.optim import Adam
-from torch.utils.data import DataLoader
-from torch.utils.data.distributed import DistributedSampler
-from transformers import AutoTokenizer, BloomTokenizerFast
-from transformers.models.gpt2.tokenization_gpt2 import GPT2Tokenizer
-
-from colossalai.logging import get_dist_logger
-from colossalai.nn.optimizer import HybridAdam
-from colossalai.tensor import ColoParameter
-
-
 def train(args):
     # configure strategy
     stage = 3
     strategy = ColossalAIStrategy(stage=stage, placement_policy='cpu')
 
-
     # configure model
     with strategy.model_init_context():
-        model = LlamaLM(pretrained=args.pretrain, lora_rank=args.lora_rank, checkpoint=True)
+        # model = LlamaLM(pretrained=args.pretrain, lora_rank=args.lora_rank, checkpoint=True)
+        model = LlamaForCausalLM(LlamaConfig(hidden_size=1024,
+                                             intermediate_size=11008,
+                                             num_hidden_layers=8,
+                                             num_attention_heads=32))
         model = model.to(torch.float16).to(torch.cuda.current_device())
 
     # configure tokenizer
@@ -62,13 +63,13 @@ def train(args):
         use_fast=False,
     )
     tokenizer.eos_token = '<\s>'
-    
+
     tokenizer.pad_token = tokenizer.eos_token
     max_len = args.max_len
 
     tokenizer = prepare_llama_tokenizer_and_embedding(tokenizer, model)
 
-    if stage==3:
+    if stage == 3:
         # this is a hack to deal with the resized embedding
         # to make sure all parameters are ColoParameter for Colossal-AI Gemini Compatiblity
         for name, param in model.named_parameters():
@@ -85,9 +86,9 @@ def train(args):
 
     # configure dataset
     train_dataset = SupervisedDataset(tokenizer=tokenizer,
-                                        data_path=args.dataset,
-                                        max_datasets_size=args.max_datasets_size,
-                                        max_length=max_len)
+                                      data_path=args.dataset,
+                                      max_datasets_size=args.max_datasets_size,
+                                      max_length=max_len)
     data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
 
     if dist.is_initialized() and dist.get_world_size() > 1:
@@ -106,7 +107,6 @@ def train(args):
                                   batch_size=args.batch_size,
                                   collate_fn=data_collator,
                                   pin_memory=True)
-
 
     trainer = SFTTrainer(model=model,
                          strategy=strategy,
@@ -131,15 +131,11 @@ def train(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--strategy',
-                        choices=['naive', 'ddp', 'colossalai_gemini', 'colossalai_zero2', 'colossalai_zero2_cpu'],
-                        default='colossalai_gemini')
-    parser.add_argument('--model', choices=['gpt2', 'bloom', 'opt', 'llama'], default='llama')
     parser.add_argument('--pretrain', type=str, default="decapoda-research/llama-7b-hf")
     parser.add_argument('--dataset', type=str, default="datasets/instinwild_ch.json")
-    parser.add_argument('--max_datasets_size', type=int, default=None)
+    parser.add_argument('--max_datasets_size', type=int, default=100)
     parser.add_argument('--save_path', type=str, default='model_saved_here/tmp')
-    parser.add_argument('--need_optim_ckpt', type=bool, default=False)
+    parser.add_argument('--need_optim_ckpt', type=bool, default=True)
     parser.add_argument('--max_epochs', type=int, default=1)
     parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--max_len', type=int, default=512)

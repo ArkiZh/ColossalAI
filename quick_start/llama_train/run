@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 
-envs=""
+envs="CUDA_LAUNCH_BLOCKING=1 "
 while getopts 'w:g:l:h:p::' OPTION; do
   case "$OPTION" in
     w)

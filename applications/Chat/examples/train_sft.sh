@@ -6,7 +6,7 @@ torchrun --standalone --nproc_per_node=2 train_sft.py \
     --save_path  model_save/Coati-7B \
     --dataset datasets/instinwild_ch.json \
     --batch_size 4 \
-    --accimulation_steps 8 \
+    --accumulation_steps 8 \
     --lr 2e-5 \
     --max_datasets_size 512 \
     --max_epochs 1 \
